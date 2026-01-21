@@ -142,7 +142,13 @@ export const generateCanonicalSpec = async (documents: DocumentData[]): Promise<
 };
 
 export const chatWithNotebook = async (history: { role: string, content: string }[], context: string) => {
-  const systemPrompt = `You are a research assistant. Answer questions based strictly on the following context. Cite your sources by filename if possible. 
+  const systemPrompt = `You are a Computational Physics Research Assistant.
+  
+  Your Capabilities:
+  1. Answer questions based strictly on the provided context.
+  2. Write and execute Python simulations when asked.
+  3. If the user asks for a simulation, plot, or calculation, output the Python code in a standard markdown block (\`\`\`python ... \`\`\`).
+  4. Use 'numpy' and 'matplotlib.pyplot' for simulations.
   
   Context:
   ${context}`;
@@ -158,11 +164,6 @@ export const chatWithNotebook = async (history: { role: string, content: string 
     }))
   });
 
-  // We actually need to send the *new* message, but for this stateless wrapper helper,
-  // we assume the caller handles the chat object or we just do single turn generation with history included manually if we want stateless.
-  // However, simpler for this app: just use generateContent with full history context if we want to be stateless, OR return the chat object.
-  // Let's do single turn generation with context for simplicity in the React state.
-  
   // Refined approach:
   const lastUserMessage = history[history.length - 1];
   const previousHistory = history.slice(0, -1);
@@ -170,7 +171,7 @@ export const chatWithNotebook = async (history: { role: string, content: string 
   const response = await ai.models.generateContent({
     model: MODEL_FAST,
     contents: [
-      { role: 'user', parts: [{ text: systemPrompt }] }, // Inject context as first user msg mostly works well for stateless
+      { role: 'user', parts: [{ text: systemPrompt }] }, 
       ...previousHistory.map(h => ({ role: h.role === 'user' ? 'user' as const : 'model' as const, parts: [{ text: h.content }] })),
       { role: 'user', parts: [{ text: lastUserMessage.content }] }
     ]

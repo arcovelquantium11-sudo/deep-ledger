@@ -1,5 +1,5 @@
 {
-  "name": "Copy of Deep Research Ledger",
-  "description": "A technical research companion that ingests documents, maps knowledge coverage, and synthesizes physics-compliant canonical specifications using Gemini.",
+  "name": "Arcovel",
+  "description": "Arcovel is a technical research companion that ingests documents, maps knowledge coverage, and synthesizes physics-compliant canonical specifications using Gemini.",
   "requestFramePermissions": []
 }

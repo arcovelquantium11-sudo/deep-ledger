@@ -5,6 +5,15 @@ export enum AppMode {
   SPEC_BUILDER = 'SPEC_BUILDER'
 }
 
+export type Theme = 'dark' | 'light' | 'contrast';
+export type FontSize = 'small' | 'medium' | 'large';
+
+export interface User {
+  id: string;
+  email: string;
+  name?: string;
+}
+
 export interface Entity {
   name: string;
   value: string;
@@ -57,4 +66,16 @@ export interface CanonicalSpec {
   sections: SpecSection[];
   assumptions: string[];
   openQuestions: string[];
+}
+
+export interface UserData {
+  documents: DocumentData[];
+  chatHistory: ChatMessage[];
+  spec: CanonicalSpec | null;
+  preferences: {
+    theme: Theme;
+    fontSize: FontSize;
+  };
+  lastMode?: AppMode;
+  lastSaved: number;
 }
