@@ -62,7 +62,7 @@ export const analyzeDocument = async (text: string): Promise<{
       contents: `Analyze the following technical document text. Extract all physical entities (constants, variables), claims (measurements, hypotheses), and identify any internal contradictions or missing units.
       
       Text:
-      ${text.substring(0, 30000)}`, // Truncate for safety in this demo
+      ${text.substring(0, 100000)}`, // Increased limit for parsed PDFs
       config: {
         responseMimeType: "application/json",
         responseSchema: extractionResponseSchema,

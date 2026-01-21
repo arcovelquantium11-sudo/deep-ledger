@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage } from '../types';
-import { runPythonCode, PythonOutput } from '../services/pyodideService';
+import { executeCode, PythonOutput, RuntimeMode } from '../services/pyodideService';
 
 interface NotebookProps {
   history: ChatMessage[];
@@ -11,6 +11,7 @@ interface NotebookProps {
 export const Notebook: React.FC<NotebookProps> = ({ history, onSend, onManualEntry }) => {
   const [input, setInput] = useState('');
   const [isCodeMode, setIsCodeMode] = useState(false);
+  const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>('BROWSER');
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -50,14 +51,29 @@ plt.show()`;
   return (
     <div className="flex-1 flex flex-col h-full bg-app-bg overflow-hidden">
       {/* Notebook Toolbar */}
-      <div className="h-10 bg-app-surface border-b border-app-border flex items-center px-4 justify-between select-none">
-        <div className="flex items-center gap-4 text-xs font-mono text-app-subtext">
-           <span className="font-bold text-app-text">Arcovel Notebook</span>
-           <span className="cursor-pointer hover:text-app-text">File</span>
-           <span className="cursor-pointer hover:text-app-text">Edit</span>
-           <span className="cursor-pointer hover:text-app-text">View</span>
+      <div className="h-12 bg-app-surface border-b border-app-border flex items-center px-4 justify-between select-none">
+        <div className="flex items-center gap-4">
+           <span className="text-sm font-bold text-app-text font-mono">Arcovel Notebook</span>
            <div className="h-4 w-px bg-app-border"></div>
-           <span className="flex items-center gap-1 text-emerald-500"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Runtime Active</span>
+           {/* Runtime Switcher */}
+           <div className="flex items-center gap-2 text-xs">
+              <span className="text-app-subtext">Runtime:</span>
+              <select 
+                value={runtimeMode} 
+                onChange={(e) => setRuntimeMode(e.target.value as RuntimeMode)}
+                className="bg-app-bg border border-app-border text-app-text rounded px-2 py-1 focus:outline-none focus:border-app-accent hover:border-app-subtext transition-colors"
+              >
+                <option value="BROWSER">Browser (Pyodide)</option>
+                <option value="LOCAL_KERNEL">Local Kernel (Port 8000)</option>
+              </select>
+           </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+           <span className={`flex items-center gap-1.5 text-xs ${runtimeMode === 'BROWSER' ? 'text-emerald-500' : 'text-blue-500'}`}>
+              <span className={`w-2 h-2 rounded-full ${runtimeMode === 'BROWSER' ? 'bg-emerald-500' : 'bg-blue-500'} animate-pulse`}></span> 
+              {runtimeMode === 'BROWSER' ? 'WASM Ready' : 'Connected'}
+           </span>
         </div>
       </div>
 
@@ -80,8 +96,8 @@ plt.show()`;
           if (msg.role === 'model' || (msg.role === 'user' && hasCode)) {
               return (
                   <div key={msg.id} className="w-full">
-                      {msg.role === 'user' && !hasCode ? null : ( // Don't render generic user chat bubbles in this specific block logic unless they are code
-                          <NotebookCell content={msg.content} role={msg.role} />
+                      {msg.role === 'user' && !hasCode ? null : ( 
+                          <NotebookCell content={msg.content} role={msg.role} runtimeMode={runtimeMode} />
                       )}
                   </div>
               )
@@ -148,7 +164,9 @@ plt.show()`;
             </button>
           </div>
           <div className="text-[10px] text-app-subtext text-center">
-             {isCodeMode ? "Manual Execution Mode (Python 3.11 via Pyodide)" : "AI Assistant Mode"}
+             {isCodeMode 
+              ? `Manual Execution Mode (${runtimeMode === 'BROWSER' ? 'Pyodide WASM' : 'Local Kernel'})` 
+              : "AI Assistant Mode"}
           </div>
         </div>
       </div>
@@ -156,7 +174,7 @@ plt.show()`;
   );
 };
 
-const NotebookCell = ({ content, role }: { content: string, role: 'user' | 'model' }) => {
+const NotebookCell = ({ content, role, runtimeMode }: { content: string, role: 'user' | 'model', runtimeMode: RuntimeMode }) => {
   // Simple parser to separate text from code blocks
   const parts = content.split(/```python/);
 
@@ -177,7 +195,7 @@ const NotebookCell = ({ content, role }: { content: string, role: 'user' | 'mode
 
         return (
           <React.Fragment key={index}>
-            <CodeCell code={code} />
+            <CodeCell code={code} runtimeMode={runtimeMode} />
             {textAfter.trim() && <div className="p-4 whitespace-pre-wrap leading-relaxed text-app-text">{textAfter}</div>}
           </React.Fragment>
         );
@@ -186,14 +204,14 @@ const NotebookCell = ({ content, role }: { content: string, role: 'user' | 'mode
   );
 };
 
-const CodeCell = ({ code }: { code: string }) => {
+const CodeCell = ({ code, runtimeMode }: { code: string, runtimeMode: RuntimeMode }) => {
   const [editableCode, setEditableCode] = useState(code);
   const [output, setOutput] = useState<PythonOutput | null>(null);
   const [isRunning, setIsRunning] = useState(false);
 
   const handleRun = async () => {
     setIsRunning(true);
-    const result = await runPythonCode(editableCode);
+    const result = await executeCode(editableCode, runtimeMode);
     setOutput(result);
     setIsRunning(false);
   };
@@ -202,7 +220,12 @@ const CodeCell = ({ code }: { code: string }) => {
     <div className="my-3 rounded-lg overflow-hidden border border-app-border shadow-md bg-[#1e1e1e] group transition-all hover:border-app-accent/50">
       {/* Cell Toolbar */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-[#252526] border-b border-[#333]">
-        <span className="text-[10px] font-mono text-gray-400">PYTHON 3</span>
+        <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono text-gray-400">PYTHON 3</span>
+            <span className={`text-[9px] px-1.5 py-0.5 rounded ${runtimeMode === 'BROWSER' ? 'bg-emerald-900/50 text-emerald-400' : 'bg-blue-900/50 text-blue-400'}`}>
+                {runtimeMode === 'BROWSER' ? 'BROWSER' : 'LOCAL'}
+            </span>
+        </div>
         <div className="flex gap-2">
             <button className="text-gray-500 hover:text-white" title="Copy">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>

@@ -35,7 +35,7 @@ export interface PythonOutput {
   error?: string;
 }
 
-export const runPythonCode = async (code: string): Promise<PythonOutput> => {
+const runPyodideCode = async (code: string): Promise<PythonOutput> => {
   if (!pyodideInstance) {
     await initPyodide();
   }
@@ -89,3 +89,39 @@ export const runPythonCode = async (code: string): Promise<PythonOutput> => {
     };
   }
 };
+
+export type RuntimeMode = 'BROWSER' | 'LOCAL_KERNEL';
+
+export const executeCode = async (code: string, mode: RuntimeMode): Promise<PythonOutput> => {
+  if (mode === 'LOCAL_KERNEL') {
+    try {
+      const response = await fetch('http://localhost:8000/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+
+      const data = await response.json();
+      return {
+        text: data.text || '',
+        image: data.image,
+        error: data.error
+      };
+    } catch (e: any) {
+      return {
+        text: '',
+        error: `Local Kernel Error: ${e.message}\nEnsure backend/server.py is running on port 8000.`
+      };
+    }
+  }
+
+  // Default to Pyodide
+  return runPyodideCode(code);
+};
+
+// Keep for backward compatibility if needed, though executeCode is preferred
+export const runPythonCode = runPyodideCode;

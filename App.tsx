@@ -4,6 +4,7 @@ import { analyzeDocument, chatWithNotebook, generateCanonicalSpec } from './serv
 import { authService } from './services/authService';
 import { storageService } from './services/storageService';
 import { initPyodide } from './services/pyodideService'; // Import Pyodide Init
+import { parseFile } from './services/fileParsingService'; // Import File Parsing
 import { Dashboard } from './components/Dashboard';
 import { Notebook } from './components/Notebook'; // Import Notebook
 
@@ -170,36 +171,32 @@ function App() {
       // Process files concurrently
       const processedDocs = await Promise.all(
         files.map(async (file) => {
-          return new Promise<DocumentData | null>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = async (event) => {
-              const text = event.target?.result as string;
-              if (!text) {
-                 resolve(null);
-                 return;
-              }
-              try {
-                const docId = crypto.randomUUID();
-                // Analyze immediately on upload (The "Digest" phase)
-                const analysis = await analyzeDocument(text);
-                
-                resolve({
-                  id: docId,
-                  filename: file.name,
-                  content: text,
-                  processed: true,
-                  entities: analysis.entities.map(en => ({...en, sourceId: docId})),
-                  claims: analysis.claims.map(c => ({...c, sourceId: docId})),
-                  conflicts: analysis.conflicts.map(c => ({...c, sourceIds: [docId]}))
-                });
-              } catch (err) {
-                console.error(`Analysis failed for ${file.name}`, err);
-                resolve(null);
-              }
+          try {
+            // Use the file parsing service to extract text from any supported format
+            const text = await parseFile(file);
+            
+            if (!text || text.trim().length === 0) {
+              console.warn(`Empty content extracted from ${file.name}`);
+              return null;
+            }
+
+            const docId = crypto.randomUUID() as string;
+            // Analyze immediately on upload (The "Digest" phase)
+            const analysis = await analyzeDocument(text);
+            
+            return {
+              id: docId,
+              filename: file.name,
+              content: text,
+              processed: true,
+              entities: analysis.entities.map(en => ({...en, sourceId: docId})),
+              claims: analysis.claims.map(c => ({...c, sourceId: docId})),
+              conflicts: analysis.conflicts.map(c => ({...c, sourceIds: [docId]}))
             };
-            reader.onerror = () => resolve(null);
-            reader.readAsText(file);
-          });
+          } catch (err) {
+            console.error(`Processing failed for ${file.name}`, err);
+            return null;
+          }
         })
       );
 
@@ -208,6 +205,8 @@ function App() {
       if (validDocs.length > 0) {
         setDocuments(prev => [...prev, ...validDocs]);
         setMode(AppMode.DASHBOARD);
+      } else {
+        alert("No valid documents could be processed. Please check file formats.");
       }
     } catch (err) {
       console.error("Batch upload error", err);
@@ -338,17 +337,23 @@ function App() {
                 <div className="text-app-text"><UploadIcon /></div>
               </div>
               <h2 className="text-3xl font-bold text-app-text mb-4">Ingest Research Material</h2>
-              <p className="text-app-subtext mb-8">Upload text-based documents (.txt, .md, .json) to begin the deep research process.</p>
+              <p className="text-app-subtext mb-8">Upload technical documents (.pdf, .docx, .txt, .md, .csv) to begin the deep research process.</p>
               
               <label className="inline-flex cursor-pointer items-center gap-3 bg-app-accent hover:bg-app-accent-hover text-white px-6 py-3 rounded-lg font-medium transition-all shadow-lg group">
                 <span className="group-hover:translate-y-[-1px] transition-transform">Select Documents</span>
-                <input type="file" className="hidden" multiple accept=".txt,.md,.json" onChange={handleFileUpload} />
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  multiple 
+                  accept=".txt,.md,.json,.csv,.xml,.yaml,.yml,.pdf,.docx,.js,.ts,.py,.html,.css" 
+                  onChange={handleFileUpload} 
+                />
               </label>
 
                <div className="mt-12 grid grid-cols-2 gap-4 text-left">
                   <div className="p-4 bg-app-surface rounded-lg border border-app-border">
                     <div className="text-blue-400 text-sm font-mono mb-1">01. Digest</div>
-                    <div className="text-xs text-app-subtext">Extracts entities, units, and physical claims automatically.</div>
+                    <div className="text-xs text-app-subtext">Extracts entities, units, and physical claims automatically from PDFs and text.</div>
                   </div>
                   <div className="p-4 bg-app-surface rounded-lg border border-app-border">
                     <div className="text-emerald-400 text-sm font-mono mb-1">02. Synthesize</div>
