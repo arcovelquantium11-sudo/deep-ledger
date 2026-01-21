@@ -240,6 +240,18 @@ function App() {
     }]);
   };
 
+  // Manual Code Injection Handler (for Notebook Mode)
+  const handleManualEntry = async (content: string) => {
+    const newMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: content,
+      timestamp: Date.now()
+    };
+    // Add to history without triggering LLM
+    setChatHistory(prev => [...prev, newMsg]);
+  };
+
   // Spec Generation Handler
   const handleGenerateSpec = async () => {
     if (documents.length === 0) return;
@@ -363,7 +375,7 @@ function App() {
         )}
 
         {mode === AppMode.NOTEBOOK && (
-          <Notebook history={chatHistory} onSend={handleSendMessage} />
+          <Notebook history={chatHistory} onSend={handleSendMessage} onManualEntry={handleManualEntry} />
         )}
 
         {mode === AppMode.SPEC_BUILDER && (

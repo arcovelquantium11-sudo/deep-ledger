@@ -13,6 +13,16 @@ export const initPyodide = async () => {
     // @ts-ignore
     pyodideInstance = await window.loadPyodide();
     await pyodideInstance.loadPackage(["numpy", "matplotlib"]);
+    
+    // Set default plot style to match dark theme
+    await pyodideInstance.runPythonAsync(`
+      import matplotlib.pyplot as plt
+      try:
+        plt.style.use('dark_background')
+      except:
+        pass
+    `);
+    
     return pyodideInstance;
   })();
 
